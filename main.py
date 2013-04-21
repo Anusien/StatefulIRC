@@ -78,3 +78,9 @@ class StateBot(bot.SimpleBot):
 	def send_message_all_channels(self, message):
 		for channel in self.channels.iterkeys():
 			self.send_message(channel, message)
+
+	def op_user(self, user, channel):
+		self.execute('MODE', channel, '+o ' + user)
+
+	def voice_user(self, user, channel):
+		self.execute('MODE', channel, '+v ' + user)
