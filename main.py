@@ -10,10 +10,10 @@ class State:
 	def name(self):
 		return ''
 
-	def OnPrivateMessage(self, sender, message):
+	def OnPrivateMessage(self, user, message):
 		return
 
-	def OnChannelMessage(self, sender, channel, message):
+	def OnChannelMessage(self, user, channel, message):
 		return
 
 	def OnEnterState(self):
@@ -22,8 +22,17 @@ class State:
 	def OnLeaveState(self):
 		return
 
+	def OnJoin(self, channel, user):
+		return
+
 	def _set_bot(self, bottoset):
 		self._bot = bottoset
+
+class User:
+	def __init__(self, nickname, hostname, ident):
+		self.nickname = nickname
+		self.hostname = hostname
+		self.ident = ident
 
 class StateBot(bot.SimpleBot):
 	def __init__(self, name, server, channels, masterstate, states):
@@ -60,43 +69,58 @@ class StateBot(bot.SimpleBot):
 		self.state = state
 		state.OnEnterState()
 
+	def _get_user_from_event(self, event):
+		nickname = event.source
+		hostname = event.host
+		ident = event.user
+		user = User(nickname, hostname, ident)
+		return user
+
 	def on_channel_message(self, event):
-		sender = event.source
+		user = self._get_user_from_event(event)
 		channel = event.target
 		message = event.message
 
-		self.masterstate.OnChannelMessage(sender, channel, message)
-		self.state.OnChannelMessage(sender, channel, message)
+		self.masterstate.OnChannelMessage(user, channel, message)
+		self.state.OnChannelMessage(user, channel, message)
+
+	def on_join(self, event):
+		user = self._get_user_from_event(event)
+		channel = event.target
+
+		self.masterstate.OnJoin(channel, user)
+		self.state.OnJoin(channel, user)
+
 	
 	def on_private_message(self, event):
-		sender = event.source
+		user = self._get_user_from_event(event)
 		message = event.message
 
-		self.masterstate.OnPrivateMessage(sender, message)
-		self.state.OnPrivateMessage(sender, message)
+		self.masterstate.OnPrivateMessage(user, message)
+		self.state.OnPrivateMessage(user, message)
 
 	def send_message_all_channels(self, message):
 		for channel in self.channels.iterkeys():
 			self.send_message(channel, message)
 
-	def op_user(self, user, channel):
-		self.execute('MODE', channel, '+o ' + user)
+	def op_user(self, nick, channel):
+		self.execute('MODE', channel, '+o ' + nick)
 
-	def voice_user(self, user, channel):
-		self.execute('MODE', channel, '-o+v ' + user + user)
+	def voice_user(self, nick, channel):
+		self.execute('MODE', channel, '-o+v ' + nick + nick)
 
-	def devoice_user(self, user, channel):
-		self.execute('MODE', channel, '-v ' + user)
+	def devoice_nick(self, nick, channel):
+		self.execute('MODE', channel, '-v ' + nick)
 
-	def voice_users(self, users, channel):
-		left_to_voice = users[:]
+	def voice_users(self, nicks, channel):
+		left_to_voice = nicks[:]
 		while left_to_voice:
 			num_to_voice = min(len(left_to_voice), 4)
 			self.execute('MODE', channel, '+v' * num_to_voice + " "  + " ".join(left_to_voice[:num_to_voice]))
 			left_to_voice = left_to_voice[left_to_voice:]
 	
-	def devoice_users(self, users, channel):
-		left_to_devoice = users[:]
+	def devoice_users(self, nicks, channel):
+		left_to_devoice = nicks[:]
 		while left_to_devoice:
 			num_to_devoice = min(len(left_to_devoice), 4)
 			self.execute('MODE', channel, '-v' * num_to_devoice + " "  + " ".join(left_to_devoice[:num_to_devoice]))

@@ -9,11 +9,11 @@ class NoisyState(main.State):
 	def name(self):
 		return 'Noisy'
 
-	def OnPrivateMessage(self, sender, message):
+	def OnPrivateMessage(self, user, message):
 		if message == 'be quiet':
 			self._bot.go_to_state('Quiet')
 
-		elif sender != self._bot.nickname:
+		elif user.nickname != self._bot.nickname:
 			self._bot.send_message_all_channels(message)
 
 class QuietState(main.State):
@@ -21,7 +21,7 @@ class QuietState(main.State):
 	def name(self):
 		return 'Quiet'
 
-	def OnPrivateMessage(self, sender, message):
+	def OnPrivateMessage(self, user, message):
 		if message == 'be noisy':
 			self._bot.go_to_state('Noisy')
 
@@ -30,8 +30,8 @@ class MasterState(main.State):
 	def name(self):
 		return 'Master'
 	
-	def OnPrivateMessage(self, sender, message):
-		print sender + ": " + message
+	def OnPrivateMessage(self, user, message):
+		print user.nickname + "!" + user.ident + "@" + user.hostname + ": " + message
 
 quietstate = QuietState()
 noisystate = NoisyState()
