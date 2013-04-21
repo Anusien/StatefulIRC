@@ -85,6 +85,9 @@ class StateBot(bot.SimpleBot):
 	def voice_user(self, user, channel):
 		self.execute('MODE', channel, '-o+v ' + user + user)
 
+	def devoice_user(self, user, channel):
+		self.execute('MODE', channel, '-v ' + user)
+
 	def voice_users(self, users, channel):
 		left_to_voice = users[:]
 		while left_to_voice:
