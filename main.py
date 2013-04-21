@@ -92,7 +92,7 @@ class StateBot(bot.SimpleBot):
 			self.execute('MODE', channel, '+v' * num_to_voice + " "  + " ".join(left_to_voice[:num_to_voice])
 			left_to_voice = left_to_voice[left_to_voice:]
 	
-	def de_voice_users(self, users, channel):
+	def devoice_users(self, users, channel):
 		left_to_devoice = users[:]
 		while left_to_devoice:
 			num_to_devoice = min(len(left_to_devoice), 4)
