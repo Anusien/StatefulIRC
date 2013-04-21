@@ -22,7 +22,7 @@ class State:
 	def OnLeaveState(self):
 		return
 
-	def _SetBot(self, bottoset):
+	def _set_bot(self, bottoset):
 		self._bot = bottoset
 
 class StateBot(bot.SimpleBot):
@@ -30,11 +30,11 @@ class StateBot(bot.SimpleBot):
 		self.state = None
 		self.statedictionary = dict()
 		self.masterstate = masterstate
-		masterstate._SetBot(self)
+		masterstate._set_bot(self)
 
 		for state in states:
 			self.statedictionary[state.name] = state
-			state._SetBot(self)
+			state._set_bot(self)
 
 		self.channelstojoin = channels
 		self.startingstate = states[0].name
@@ -46,15 +46,15 @@ class StateBot(bot.SimpleBot):
 	def on_welcome(self, event):
 		for channel in self.channelstojoin:
 			self.join(channel)
-		self.GoToState(self.startingstate)
+		self.go_to_state(self.startingstate)
 
-	def _FindState(self, statename):
+	def _find_state(self, statename):
 		if statename in self.statedictionary:
 			return self.statedictionary[statename]
 		raise Exception("No such state: " + statename)
 
-	def GoToState(self, statename):
-		state = _FindState(statename)
+	def go_to_state(self, statename):
+		state = self._find_state(statename)
 		if self.state != None:
 			self.state.OnLeaveState()
 		self.state = state
@@ -71,3 +71,7 @@ class StateBot(bot.SimpleBot):
 
 		self.masterstate.OnPrivateMessage(sender, message)
 		self.state.OnPrivateMessage(sender, message)
+
+	def send_message_all_channels(self, message):
+		for channel in self.channels.iterkeys():
+			self.send_message(channel, message)

@@ -11,11 +11,10 @@ class NoisyState(main.State):
 
 	def OnPrivateMessage(self, sender, message):
 		if message == 'be quiet':
-			self._bot.GoToState('Quiet')
+			self._bot.go_to_state('Quiet')
 
 		elif sender != self._bot.nickname:
-			for channel in self._bot.channels.iterkeys():
-				self._bot.send_message(channel, message[:])
+			self._bot.send_message_all_channels(message)
 
 class QuietState(main.State):
 	@property
@@ -24,7 +23,7 @@ class QuietState(main.State):
 
 	def OnPrivateMessage(self, sender, message):
 		if message == 'be noisy':
-			self._bot.GoToState('Noisy')
+			self._bot.go_to_state('Noisy')
 
 class MasterState(main.State):
 	@property
