@@ -1,6 +1,7 @@
 """ Bot intended to play The Resistance """
 import main
 import random
+import time
 
 class MasterState(main.State):
 	@property
@@ -195,18 +196,21 @@ class MissionState(main.State):
 			self._bot.send_message(sender, '/message SUCCESS or FAILURE to pass or fail the mission.')
 			return
 		if message == 'success' or message == 's':
-			self.playervotes[sender] = 1
+			self.playervotes[sender] = 0
 		elif message == 'failure' or message == 'f':
 			if sender not in spies:
 				self._bot.send_message(sender, 'Loyal Resistance members should always vote SUCCESS, please vote again.')
 				return
-			self.playervotes[sender] = 0
+			self.playervotes[sender] = 1
 		if len(self.playervotes) == len(team):
-			vote = sum(dictionary.values()) >= lookup_sabotage_size(roundnum)
-			if not vote:
+			numfails = sum(dictionary.values())
+			vote = numfailures >= lookup_sabotage_size(roundnum)
+			if vote:
 				failedmissions += 1	
-			text = 'success' if vote else 'failure'
-			self._bot.send_message(channel, 'The missions was a ' + text + '!')
+			resulttext = 'failure' if vote else 'success'
+			votetext = ' vote' if numfails == 1 else ' votes'
+
+			self._bot.send_message(channel, 'There were ' + numfails + votetext + ' to sabotage. The missions was a ' + resulttext + '!')
 			if failedmissions == 3:
 				self._bot_send_message(channel, 'The game is over. Spies win!')
 				self._bot.go_to_state('Endgame')
@@ -215,6 +219,8 @@ class MissionState(main.State):
 				self._bot.go_to_state('Endgame')
 			else:
 				roundnum += 1
+				time.sleep(random.randint(2,6))
+
 				self._bot.got_to_state('Leading')
 
 class EndgameState(main.State):
