@@ -1,8 +1,6 @@
 from ircutils import bot
 import abc 
 
-debug = 1
-
 class State:
 	__metaclass__ = abc.ABCMeta
 	def __init__(self):
