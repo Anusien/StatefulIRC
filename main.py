@@ -73,6 +73,3 @@ class StateBot(bot.SimpleBot):
 
 		self.masterstate.OnPrivateMessage(sender, message)
 		self.state.OnPrivateMessage(sender, message)
-
-	def on_error(self, event):
-		print event
