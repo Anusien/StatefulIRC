@@ -70,8 +70,10 @@ class FormingState(main.State):
 				self._bot.send_message(channel, len(players) + ' players are in the game. Need exactly 5 to start.')
 			else:
 				self._bot.send_message(channel, 'Game formed.')
+				lowercaseplayers = [x.lower() for x in players]
 				random.shuffle(players)
-				numspies = lookup_num_spies(len(players))
+				numplayers = len(players)
+				numspies = lookup_num_spies(numplayers)
 				spies = players[:numspies]
 				for player in spies:
 					self._bot.send_message(player, 'You are an IMPERIAL SPY!')
@@ -118,12 +120,11 @@ class LeadingState(main.State):
 				self._bot.send_message(self.leader,
 					'You picked ' + numpicked + ' players when you should pick ' + teamsize + '.')
 				return
-			lowercaseplayers = [x.lower() for x in players]
 			for picked in pickedplayers:
 				if picked not in lowercaseplayers:
 					self._bot.send_message(self.leader, picked = ' is not in the list of players. Pick again!')
 					return
-				team.append(players[lowercaseplayers.index(picked)])
+				team.append(get_proper_capitalized_player(picked)])
 			leaderattempts += 1
 			self._bot.go_to_state('Approving')
 
@@ -139,7 +140,35 @@ class ApprovingState(main.State):
 			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.')
 		self._bot.send_message(channel,
 			'This is attempt ' + leaderattempts + '. The mission is a failure after 5 attempts.')
-		playervotes = dict()
+		self.playervotes = dict()
+
+	def OnLeaveState(self):
+		self._bot.send_message(channel, 'Here is the vote:')
+		for player in self.playervotes.iterkeys():
+			playername = get_proper_capitalized_player(player)
+			vote = 'Yes' if self.playervotes[player] else 'No'
+			self._bot.send_message(channel, playername + ': ' + vote)
+
+	def OnPrivateMessage(self, sender, message):
+		message = message.lower()
+		sender = sender.lower()
+		if sender not in lowercaseplayers:
+			return
+		if message == 'help':
+			self._bot.send_message(sender, '/message YES or NO to support or reject the mission.')
+			return
+		if message == 'yes' or message = 'y':
+			self.playervotes[sender] = 1
+		elif message == 'no' or message = 'n':
+			self.playervotes[sender] = 0
+		if(len(dictionary)) == numplayers):
+			vote = sum(dictionary.values()) >= numplayers / 2
+			if vote:
+				self._bot.go_to_state('Mission')
+			else:
+				self._bot.send_message(channel, 'The vote was rejected!')
+				self._bot.go_to_state('Leading')
+
 
 def lookup_team_size(numround):
 	teamsize = [3, 4, 4, 5, 5]
@@ -152,6 +181,10 @@ def lookup_sabotage_size(numround):
 def lookup_num_spies(numplayers):
 	return 2
 	
+def get_proper_capitalized_player(lowercase_player_name):
+	for player in players:
+		if x.lower() == lowercase_player_name:
+			return player
 
 masterstate = MasterState()
 offstate = OffState()
@@ -162,8 +195,10 @@ approvingstate = ApprovingState()
 
 channel = '#mtgresistance'
 players = []
+lowercaseplayers = []
 team = []
 spies = []
+numplayers = 0
 roundnum = 0
 leaderattempts = 0
 
