@@ -92,3 +92,9 @@ class StateBot(bot.SimpleBot):
 	def de_voice_users(self, users, channel):
 		left_to_devoice = users[:]
 		self.execute('MODE', channel, '-o' * min(len(left_to_devoice)), 4) + " "  + " ".join(left_to_devoice[:4])
+
+	def moderate_channel(self, channel):
+		self.execute('MODE', channel, '+m')
+	
+	def unmoderate_channel(self, channel):
+		self.execute('MODE', channel, '-m')
