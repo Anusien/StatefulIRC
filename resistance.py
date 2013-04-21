@@ -102,6 +102,10 @@ class LeadingState(main.State):
 		self._bot.send_message(channel,
 			'The current leader is ' + self.leader + '. Waiting for them to choose a team.')
 		send_syntax_to_leader()
+		self._bot.voice_users(players, channel)
+
+	def OnLeaveState(self):
+		self._bot.devoice_users(players, channel)
 
 	def send_syntax_to_leader(self):
 		self._bot.send_message(self.leader, 'You need to pick ' + teamsize + ' people to go on a mission.')
@@ -141,6 +145,10 @@ class ApprovingState(main.State):
 		self._bot.send_message(channel,
 			'This is attempt ' + leaderattempts + '. The mission is a failure after 5 attempts.')
 		self.playervotes = dict()
+		self._bot.voice_users(players, channel)
+
+	def OnLeaveState(self):
+		self._bot.devoice_users(players, channel)
 
 	def OnLeaveState(self):
 		self._bot.send_message(channel, 'Here is the vote:')
