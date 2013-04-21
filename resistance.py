@@ -2,6 +2,7 @@
 import main
 import random
 import time
+from ircutils import format
 
 gamechannel = '#mtgresistance'
 players = dict() #Maps lowercase representation of the user to the User object
@@ -34,10 +35,10 @@ class OffState(main.State):
 		return 'Off'
 
 	def OnEnterState(self):
-		self._bot.send_message_all_channels('Turning off. Cancelling any game in progress.')
+		self._bot.send_message_all_channels(format.bold('Turning off. Cancelling any game in progress.'))
 
 	def OnLeaveState(self):
-		self._bot.send_message_all_channels('Turning back on. Type !newgame to start a new game.')
+		self._bot.send_message_all_channels(format.bold('Turning back on. Type !newgame to start a new game.'))
 	
 	def OnPrivateMessage(self, user, message):
 		if is_owner(user) and message.lower() == "turn on":
@@ -51,7 +52,7 @@ class IdleState(main.State):
 	def OnEnterState(self):
 		self._bot.unmoderate_channel(gamechannel)
 
-	def OnChannelMessage(self, user, message):
+	def OnChannelMessage(self, user, channel, message):
 		if message.lower() == '!newgame':
 			self._bot.go_to_state('Forming')
 
@@ -65,20 +66,20 @@ class FormingState(main.State):
 		voiced = True 
 
 		players.clear()
-		self._bot.send_message(gamechannel, 'Newgame forming, type !join to join.')
+		self._bot.send_message(gamechannel, format.bold('Newgame forming, type !join to join.'))
 
 	def OnLeaveState(self):
-		self._bot.devoice_users(players, gamechannel)
+		devoice_room(self._bot)
 	
 	def OnChannelMessage(self, user, channel, message):
 		message = message.lower()
 		playing = is_nickname_in_game(user.nickname)
 		if message == '!cancel':
-			self._bot.send_message(gamechannel, 'Game cancelled.')
+			self._bot.send_message(gamechannel, format.bold('Game cancelled.'))
 			self._bot.go_to_state('Idle')
 		elif message == '!join':
 			if not playing:
-				players[users.nickname.lower()] = user
+				players[user.nickname.lower()] = user
 				self._bot.voice_user(sender, gamechannel)
 		elif message == "!leave":
 			if playing:
@@ -86,14 +87,15 @@ class FormingState(main.State):
 				self._bot.devoice_user(sender, gamechannel)
 		elif message == '!formed':
 			if len(players) < minplayers or len(players) > maxplayers:
-				self._bot.send_message(gamechannel, len(players) + ' players are in the game. Need between ' + minplayers + ' and ' + maxplayers + ' to start.')
+				self._bot.send_message(gamechannel, format.bold(len(players) + ' players are in the game. Need between ' + minplayers + ' and ' + maxplayers + ' to start.'))
 			else:
 				global roundnum
 				roundnum = 1
 
+				self._bot.moderate_channel(gamechannel)
 				numplayers = len(players)
 				numspies = lookup_num_spies(numplayers)
-				self._bot.send_message(gamechannel, 'Game formed with ' + numspies + ' spies and ' + numplayers - numspies + ' + Resistance members.')
+				self._bot.send_message(gamechannel, format.bold('Game formed with ' + numspies + ' spies and ' + numplayers - numspies + ' + Resistance members.'))
 
 				leaderlist[:] = []
 				for user in players.itervalues():
@@ -120,12 +122,12 @@ class LeadingState(main.State):
 		self.teamsize = lookup_team_size(numplayers, roundnum)
 		sabotagesize = lookup_team_size(numplayers, roundnum)
 
-		self._bot.send_message(gamechannel,
-			'It is round ' + roundnum + '. The spies have won ' + failedmissions + ' of them (3 to win). There have been ' + leaderattempts + ' this round.')
-		self._bot.send_message(gamechannel,
-			'The team size will be ' + self.teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.')
-		self._bot.send_message(gamechannel,
-			'The current leader is ' + self.leader + '. Waiting for them to choose a team. The order of leaders will be ' + ', '.join(players))
+		self._bot.send_message(gamechannel, format.bold(
+			'It is round ' + roundnum + '. The spies have won ' + failedmissions + ' of them (3 to win). There have been ' + leaderattempts + ' this round.'))
+		self._bot.send_message(gamechannel, format.bold(
+			'The team size will be ' + self.teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.'))
+		self._bot.send_message(gamechannel, format.bold(
+			'The current leader is ' + self.leader + '. Waiting for them to choose a team. The order of leaders will be ' + ', '.join(players)))
 		self.send_syntax_to_leader()
 		self._bot.voice_users(players, gamechannel)
 
@@ -166,24 +168,23 @@ class ApprovingState(main.State):
 
 	def OnEnterState(self):
 		players.append(players.pop(0))
-		self._bot.send_message(gamechannel, 'The leader picked this team: ' + ', '.join(team))
-		self._bot.send_message(gamechannel,
-			'This is attempt ' + leaderattempts + '. The mission is automatically accepted after 5 attempts.')
+		self._bot.send_message(gamechannel, format.bold(
+			'The leader picked this team: ' + ', '.join(team) + 'This is attempt ' + leaderattempts + '. The mission is automatically accepted after 5 attempts.'))
 		if leaderattempts == 5:
 			self._bot.go_to_state('Mission')
 			return
-		self._bot.send_message(gamechannel,
-			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.')
+		self._bot.send_message(gamechannel, format.bold(
+			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.'))
 		self.playervotes = dict()
 		self._bot.voice_users(players, gamechannel)
 
 	def OnLeaveState(self):
 		self._bot.devoice_users(players, gamechannel)
-		self._bot.send_message(gamechannel, 'Here is the vote:')
+		self._bot.send_message(gamechannel, format.bold('Here is the vote:'))
 		for player in self.playervotes.iterkeys():
 			playername = get_proper_capitalized_player(player)
 			vote = 'Yes' if self.playervotes[player] else 'No'
-			self._bot.send_message(gamechannel, playername + ': ' + vote)
+			self._bot.send_message(gamechannel, format.bold(playername + ': ' + vote))
 
 	def OnPrivateMessage(self, sender, message):
 		message = message.lower()
@@ -203,7 +204,7 @@ class ApprovingState(main.State):
 			if vote:
 				self._bot.go_to_state('Mission')
 			else:
-				self._bot.send_message(gamechannel, 'The vote was rejected!')
+				self._bot.send_message(gamechannel, format.bold('The vote was rejected!'))
 				self._bot.go_to_state('Leading')
 
 class MissionState(main.State):
@@ -215,8 +216,8 @@ class MissionState(main.State):
 		self.playervotes = dict()
 		sabotagesize = lookup_sabotage_size(len(players), roundnum)
 		votetext = 'vote is' if sabotagesize == 1 else 'votes are'
-		self._bot.send_message(gamechannel,
-			'The team was accepted! /message me with SUCCESS or FAILURE as your vote for this mission. Loyal resistance members should always vote SUCCESS. ' + sabotagesize + ' ' + votetext + ' required to fail this mission.')
+		self._bot.send_message(gamechannel, format.bold(
+			'The team was accepted! /message me with SUCCESS or FAILURE as your vote for this mission. Loyal resistance members should always vote SUCCESS. ' + sabotagesize + ' ' + votetext + ' required to fail this mission.'))
 	
 	def OnPrivateMessage(self, sender, message):
 		global roundnum
@@ -241,12 +242,12 @@ class MissionState(main.State):
 			resulttext = 'failure' if vote else 'success'
 			votetext = ' vote' if numfails == 1 else ' votes'
 
-			self._bot.send_message(gamechannel, 'There were ' + numfails + votetext + ' to sabotage. The missions was a ' + resulttext + '!')
+			self._bot.send_message(gamechannel, format.bold('There were ' + numfails + votetext + ' to sabotage. The missions was a ' + resulttext + '!'))
 			if failedmissions == 3:
-				self._bot.send_message(gamechannel, 'The game is over. Spies win!')
+				self._bot.send_message(gamechannel, format.bold('The game is over. Spies win!'))
 				self._bot.go_to_state('Endgame')
 			elif (roundnum - failedmissions) == 3:
-				self._bot.send_message(gamechannel, 'The game is over, The Resistance wins!')
+				self._bot.send_message(gamechannel, format.bold('The game is over, The Resistance wins!'))
 				self._bot.go_to_state('Endgame')
 			else:
 				roundnum += 1
@@ -260,12 +261,12 @@ class EndgameState(main.State):
 		return 'Endgame'
 	
 	def EnterState(self):
-		self._bot.send_message(gamechannel, 'The roles were:')
+		self._bot.send_message(gamechannel, format.bold('The roles were:'))
 		for player in players:
 			if player in spies:
-				self._bot.send_message(gamechannel, player + ' => Spy')
+				self._bot.send_message(gamechannel, format.bold(player + ' => Spy'))
 			else:
-				self._bot.send_message(gamechannel, players + ' => Resistance')
+				self._bot.send_message(gamechannel, format.bold(players + ' => Resistance'))
 		self._bot.go_to_state('Idle')
 
 		
@@ -315,13 +316,13 @@ def voice_room(bot):
 	""" Automatically voice all the players and set the voiced state to true. """
 	global voiced
 	voiced = True
-	bot.voice_users(players, gamechannel)
+	bot.voice_users(players.keys(), gamechannel)
 
 def devoice_room(bot):
 	""" Automatically devoice all the players and set the voiced state to false. """
 	global voiced
 	voiced = False
-	bot.devoice_users(players, gamechannel)
+	bot.devoice_users(players.keys(), gamechannel)
 
 masterstate = MasterState()
 offstate = OffState()
