@@ -159,9 +159,12 @@ class ApprovingState(main.State):
 		players.append(players.pop(0))
 		self._bot.send_message(gamechannel, 'The leader picked this team: ' + ', '.join(team))
 		self._bot.send_message(gamechannel,
-			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.')
+			'This is attempt ' + leaderattempts + '. The mission is automatically accepted after 5 attempts.')
+		if leaderattempts == 5:
+			self._bot.go_to_state('Mission')
+			return
 		self._bot.send_message(gamechannel,
-			'This is attempt ' + leaderattempts + '. The mission is a failure after 5 attempts.')
+			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.')
 		self.playervotes = dict()
 		self._bot.voice_users(players, gamechannel)
 
