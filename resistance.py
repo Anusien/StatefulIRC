@@ -86,11 +86,11 @@ class FormingState(main.State):
 				global numplayers
 				global roundnum
 
-				self._bot.send_message(gamechannel, 'Game formed.')
-				lowercaseplayers[:] = [x.lower() for x in players]
-				random.shuffle(players)
 				numplayers = len(players)
 				numspies = lookup_num_spies(numplayers)
+				self._bot.send_message(gamechannel, 'Game formed with ' + numspies + ' spies and ' + numplayers - numspies + ' + Resistance members.')
+				lowercaseplayers[:] = [x.lower() for x in players]
+				random.shuffle(players)
 				spies[:] = players[:numspies]
 				for player in spies:
 					self._bot.send_message(player, 'You are an IMPERIAL SPY! The spies are ' + ', '.join(spies))
