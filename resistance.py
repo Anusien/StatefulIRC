@@ -71,6 +71,13 @@ class FormingState(main.State):
 			else:
 				self._bot.send_message(channel, 'Game formed.')
 				random.shuffle(players)
+				numspies = lookup_num_spies(len(players))
+				spies = players[:numspies]
+				for player in spies:
+					self._bot.send_message(player, 'You are an IMPERIAL SPY!')
+				for layer in players[numspies:]
+					self._bot.send_message(player, 'You are a loyal member of the Resistance.')
+				random.shuffle(players)
 				print 'The order of leaders will be ' + ', '.join(players)
 				roundnum = 1
 				self._bot.go_to_state('Leading')
@@ -117,6 +124,7 @@ class LeadingState(main.State):
 					self._bot.send_message(self.leader, picked = ' is not in the list of players. Pick again!')
 					return
 				team.append(players[lowercaseplayers.index(picked)])
+			leaderattempts += 1
 			self._bot.go_to_state('Approving')
 
 class ApprovingState(main.State):
@@ -124,6 +132,14 @@ class ApprovingState(main.State):
 	def name(self):
 		return 'Approving'
 
+	def OnEnterState(self):
+		players.append(players.pop(0))
+		self._bot.send_message(channel, 'The leader picked this team: ' + ', '.join(team))
+		self._bot.send_message(channel,
+			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.')
+		self._bot.send_message(channel,
+			'This is attempt ' + leaderattempts + '. The mission is a failure after 5 attempts.')
+		playervotes = dict()
 
 def lookup_team_size(numround):
 	teamsize = [3, 4, 4, 5, 5]
@@ -132,6 +148,9 @@ def lookup_team_size(numround):
 def lookup_sabotage_size(numround):
 	sabotagesize = [1, 1, 1, 2, 1]
 	return sabotagesize[numround-1]
+
+def lookup_num_spies(numplayers):
+	return 2
 	
 
 masterstate = MasterState()
@@ -144,6 +163,7 @@ approvingstate = ApprovingState()
 channel = '#mtgresistance'
 players = []
 team = []
+spies = []
 roundnum = 0
 leaderattempts = 0
 
