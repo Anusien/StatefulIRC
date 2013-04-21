@@ -3,6 +3,19 @@ import main
 import random
 import time
 
+gamechannel = '#mtgresistance'
+players = []
+lowercaseplayers = []
+team = []
+spies = []
+numplayers = 0
+roundnum = 0
+failedmissions = 0
+leaderattempts = 0
+
+minplayers = 5
+maxplayers = 10
+
 class MasterState(main.State):
 	@property
 	def name(self):
@@ -35,7 +48,7 @@ class IdleState(main.State):
 		return 'Idle'
 	
 	def OnEnterState(self):
-		self._bot.unmoderate_channel(channel)
+		self._bot.unmoderate_channel(gamechannel)
 
 	def OnChannelMessage(self, sender, channel, message):
 		if message.lower() == '!newgame':
@@ -47,38 +60,41 @@ class FormingState(main.State):
 		return 'Forming'
 	
 	def OnEnterState(self):
-		users = []
-		self._bot.send_message(channel, 'Newgame forming, type !join to join.')
+		players[:] = []
+		self._bot.send_message(gamechannel, 'Newgame forming, type !join to join.')
 
 	def OnLeaveState(self):
-		self._bot.devoice_users(players, channel)
+		self._bot.devoice_users(players, gamechannel)
 	
 	def OnChannelMessage(self, sender, channel, message):
 		message = message.lower()
 		if message == '!cancel':
-			self._bot.send_message(channel, 'Game cancelled.')
+			self._bot.send_message(gamechannel, 'Game cancelled.')
 			self._bot.go_to_state('Idle')
 		elif message == '!join':
 			if sender not in players:
 				players.append(sender)
-				self._bot.voice_user(sender, channel)
+				self._bot.voice_user(sender, gamechannel)
 		elif message == "!leave":
 			if sender in players:
 				players.remove(sender)
-				self._bot.devoice_user(sender, channel)
+				self._bot.devoice_user(sender, gamechannel)
 		elif message == '!formed':
-			if len(players) != 5:
-				self._bot.send_message(channel, len(players) + ' players are in the game. Need exactly 5 to start.')
+			if len(players) < minplayers or len(players) > maxplayers:
+				self._bot.send_message(gamechannel, len(players) + ' players are in the game. Need between ' + minplayers + ' and ' + maxplayers + ' to start.')
 			else:
-				self._bot.send_message(channel, 'Game formed.')
-				lowercaseplayers = [x.lower() for x in players]
+				global numplayers
+				global roundnum
+
+				self._bot.send_message(gamechannel, 'Game formed.')
+				lowercaseplayers[:] = [x.lower() for x in players]
 				random.shuffle(players)
 				numplayers = len(players)
 				numspies = lookup_num_spies(numplayers)
-				spies = players[:numspies]
+				spies[:] = players[:numspies]
 				for player in spies:
-					self._bot.send_message(player, 'You are an IMPERIAL SPY!')
-				for layer in players[numspies:]:
+					self._bot.send_message(player, 'You are an IMPERIAL SPY! The spies are ' + ', '.join(spies))
+				for player in players[numspies:]:
 					self._bot.send_message(player, 'You are a loyal member of The Resistance.')
 				random.shuffle(players)
 				roundnum = 1
@@ -91,38 +107,40 @@ class LeadingState(main.State):
 	
 	def OnEnterstate(self):
 		self.leader = players[0]
-		team = []
-		teamsize = lookup_team_size(roundnum)
-		sabotagesize = lookup_team_size(roundnum)
+		team[:] = []
+		self.teamsize = lookup_team_size(numplayers, roundnum)
+		sabotagesize = lookup_team_size(numplayers, roundnum)
 
-		self._bot.send_message(channel,
+		self._bot.send_message(gamechannel,
 			'It is round ' + roundnum + '. The spies have won ' + failedmissions + ' of them (3 to win). There have been ' + leaderattempts + ' this round.')
-		self._bot.send_message(channel,
-			'The team size will be ' + teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.')
-		self._bot.send_message(channel,
+		self._bot.send_message(gamechannel,
+			'The team size will be ' + self.teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.')
+		self._bot.send_message(gamechannel,
 			'The current leader is ' + self.leader + '. Waiting for them to choose a team. The order of leaders will be ' + ', '.join(players))
-		send_syntax_to_leader()
-		self._bot.voice_users(players, channel)
+		self.send_syntax_to_leader()
+		self._bot.voice_users(players, gamechannel)
 
 	def OnLeaveState(self):
-		self._bot.devoice_users(players, channel)
+		self._bot.devoice_users(players, gamechannel)
 
 	def send_syntax_to_leader(self):
-		self._bot.send_message(self.leader, 'You need to pick ' + teamsize + ' people to go on a mission.')
-		self._bot.send_message(self.leader, 'Syntax: Pick' + ' <Name>' * teamsize)
+		self._bot.send_message(self.leader, 'You need to pick ' + self.teamsize + ' people to go on a mission.')
+		self._bot.send_message(self.leader, 'Syntax: Pick' + ' <Name>' * self.teamsize)
 
 	def OnPrivateMessage(self, sender, message):
 		if sender != self.leader:
 			return
 		messagetokens = message.lower().split()
 		if messagetokens[0] == 'help':
-			send_syntax_to_leader()
+			self.send_syntax_to_leader()
 		elif messagetokens[0] == 'pick':
+			global leaderattempts
+
 			pickedplayers = set(messagetokens[1:])
 			numpicked = len(messagetokens[1:])
-			if numpicked != teamsize:
+			if numpicked != self.teamsize:
 				self._bot.send_message(self.leader,
-					'You picked ' + numpicked + ' players when you should pick ' + teamsize + '.')
+					'You picked ' + numpicked + ' players when you should pick ' + self.teamsize + '.')
 				return
 			for picked in pickedplayers:
 				if picked not in lowercaseplayers:
@@ -139,23 +157,21 @@ class ApprovingState(main.State):
 
 	def OnEnterState(self):
 		players.append(players.pop(0))
-		self._bot.send_message(channel, 'The leader picked this team: ' + ', '.join(team))
-		self._bot.send_message(channel,
+		self._bot.send_message(gamechannel, 'The leader picked this team: ' + ', '.join(team))
+		self._bot.send_message(gamechannel,
 			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.')
-		self._bot.send_message(channel,
+		self._bot.send_message(gamechannel,
 			'This is attempt ' + leaderattempts + '. The mission is a failure after 5 attempts.')
 		self.playervotes = dict()
-		self._bot.voice_users(players, channel)
+		self._bot.voice_users(players, gamechannel)
 
 	def OnLeaveState(self):
-		self._bot.devoice_users(players, channel)
-
-	def OnLeaveState(self):
-		self._bot.send_message(channel, 'Here is the vote:')
+		self._bot.devoice_users(players, gamechannel)
+		self._bot.send_message(gamechannel, 'Here is the vote:')
 		for player in self.playervotes.iterkeys():
 			playername = get_proper_capitalized_player(player)
 			vote = 'Yes' if self.playervotes[player] else 'No'
-			self._bot.send_message(channel, playername + ': ' + vote)
+			self._bot.send_message(gamechannel, playername + ': ' + vote)
 
 	def OnPrivateMessage(self, sender, message):
 		message = message.lower()
@@ -170,11 +186,11 @@ class ApprovingState(main.State):
 		elif message == 'no' or message == 'n':
 			self.playervotes[sender] = 0
 		if len(self.playervotes) == numplayers:
-			vote = sum(dictionary.values()) >= numplayers / 2
+			vote = sum(self.playervotes.values()) >= numplayers / 2
 			if vote:
 				self._bot.go_to_state('Mission')
 			else:
-				self._bot.send_message(channel, 'The vote was rejected!')
+				self._bot.send_message(gamechannel, 'The vote was rejected!')
 				self._bot.go_to_state('Leading')
 
 class MissionState(main.State):
@@ -184,12 +200,13 @@ class MissionState(main.State):
 
 	def EnterState(self):
 		self.playervotes = dict()
-		sabotagesize = lookup_sabotage_size(roundnum)
+		sabotagesize = lookup_sabotage_size(numplayers, roundnum)
 		votetext = 'vote is' if sabotagesize == 1 else 'votes are'
-		self._bot.send_message(channel,
+		self._bot.send_message(gamechannel,
 			'The team was accepted! /message me with SUCCESS or FAILURE as your vote for this mission. Loyal resistance members should always vote SUCCESS. ' + sabotagesize + ' ' + votetext + ' required to fail this mission.')
 	
 	def OnPrivateMessage(self, sender, message):
+		global roundnum
 		if sender not in team:
 			return
 		if message == 'help':
@@ -203,23 +220,24 @@ class MissionState(main.State):
 				return
 			self.playervotes[sender] = 1
 		if len(self.playervotes) == len(team):
-			numfails = sum(dictionary.values())
-			vote = numfailures >= lookup_sabotage_size(roundnum)
+			numfails = sum(self.playervotes.values())
+			vote = numfails >= lookup_sabotage_size(numplayers, roundnum)
 			if vote:
+				global failedmissions
 				failedmissions += 1	
 			resulttext = 'failure' if vote else 'success'
 			votetext = ' vote' if numfails == 1 else ' votes'
 
-			self._bot.send_message(channel, 'There were ' + numfails + votetext + ' to sabotage. The missions was a ' + resulttext + '!')
+			self._bot.send_message(gamechannel, 'There were ' + numfails + votetext + ' to sabotage. The missions was a ' + resulttext + '!')
 			if failedmissions == 3:
-				self._bot_send_message(channel, 'The game is over. Spies win!')
+				self._bot.send_message(gamechannel, 'The game is over. Spies win!')
 				self._bot.go_to_state('Endgame')
-			elif roundnum - failedmissions == 3:
-				self._bot_send_message(channel, 'The game is over, The Resistance wins!')
+			elif (roundnum - failedmissions) == 3:
+				self._bot.send_message(gamechannel, 'The game is over, The Resistance wins!')
 				self._bot.go_to_state('Endgame')
 			else:
 				roundnum += 1
-				time.sleep(random.randint(2,6))
+				time.sleep(random.randint(2, 6))
 
 				self._bot.got_to_state('Leading')
 
@@ -229,26 +247,39 @@ class EndgameState(main.State):
 		return 'Endgame'
 	
 	def EnterState(self):
-		self._bot.send_message(channel, 'The roles were:')
+		self._bot.send_message(gamechannel, 'The roles were:')
 		for player in players:
 			if player in spies:
-				self._bot.send_message(channel, player + ' => Spy')
+				self._bot.send_message(gamechannel, player + ' => Spy')
 			else:
-				self._bot.send_message(channe, players + ' => Resistance')
+				self._bot.send_message(gamechannel, players + ' => Resistance')
 		self._bot.go_to_state('Idle')
 
 		
 
-def lookup_team_size(numround):
-	teamsize = [3, 4, 4, 5, 5]
-	return teamsize[numround-1]
+def lookup_team_size(_numplayers, _numround):
+	teamsize = [[2, 3, 2, 3, 3],
+				[2, 3, 4, 3, 4],
+				[2, 3, 3, 4, 4],
+				[3, 4, 4, 5, 5],
+				[3, 4, 4, 5, 5],
+				[3, 4, 4, 5, 5]]
+	return teamsize[_numplayers-5][_numround-1]
 
-def lookup_sabotage_size(numround):
-	sabotagesize = [1, 1, 1, 2, 1]
-	return sabotagesize[numround-1]
+def lookup_sabotage_size(_numplayers, _numround):
+	sabotagesize = [[1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1],
+					[1, 1, 1, 2, 1],
+					[1, 1, 1, 2, 1],
+					[1, 1, 1, 2, 1],
+					[1, 1, 1, 2, 1]]
 
-def lookup_num_spies(numplayers):
-	return 2
+	return sabotagesize[_numplayers - 5][_numround-1]
+
+def lookup_num_spies(_numplayers):
+	# The number of spies is one third the size of the group rounded up
+	numspies = [2, 2, 3, 3, 3, 4]
+	return numspies[_numplayers - 5]
 	
 def get_proper_capitalized_player(lowercase_player_name):
 	for player in players:
@@ -262,14 +293,4 @@ formingstate = FormingState()
 leadingstate = LeadingState()
 approvingstate = ApprovingState()
 
-channel = '#mtgresistance'
-players = []
-lowercaseplayers = []
-team = []
-spies = []
-numplayers = 0
-roundnum = 0
-failedmissions = 0
-leaderattempts = 0
-
-resistancebot = main.StateBot('Resistr', 'irc.efnet.nl', [channel], masterstate, [idlestate, offstate, formingstate, leadingstate, approvingstate])
+resistancebot = main.StateBot('Resistr', 'irc.efnet.nl', [gamechannel], masterstate, [idlestate, offstate, formingstate, leadingstate, approvingstate])
