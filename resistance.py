@@ -203,7 +203,7 @@ class MissionState(main.State):
 			self.playervotes[sender] = 0
 		if len(self.playervotes) == len(team):
 			vote = sum(dictionary.values()) >= lookup_sabotage_size(roundnum)
-			if !vote:
+			if not vote:
 				failedmissions += 1	
 			text = 'success' if vote else 'failure'
 			self._bot.send_message(channel, 'The missions was a ' + text + '!')
