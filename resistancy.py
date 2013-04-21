@@ -50,7 +50,7 @@ class FormingState(main.State):
 		self._bot.send_message(channel, 'Newgame forming, type !join to join.')
 
 	def OnLeaveState(self):
-		self._bot.devoice_users(users, channel)
+		self._bot.devoice_users(players, channel)
 	
 	def OnChannelMessage(self, sender, channel, message):
 		message = message.lower()
@@ -75,17 +75,28 @@ class FormingState(main.State):
 				roundnum = 1
 				self._bot.go_to_state('Leading')
 
-class LeadingState(main.State)
+class LeadingState(main.State):
 	@property
 	def name(self):
 		return 'Leading'
 	
 	def OnEnterstate(self):
 		self.leader = players[0]
+		team = []
 		teamsize = lookup_team_size(len(players), roundnum)
 		sabotagesize = lookup_team_size(len(players), roundnum)
-		self._bot.send_message(channel, 'It is round ' + roundnum + '. There have been ' + leaderattempts + ' previously.' + 
+
+		self._bot.send_message(channel, 'It is round ' + roundnum + '. There have been ' + leaderattempts + ' previously.')
+		self._bot.send_message(channel, 'The team size will be ' + teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.')
 		self._bot.send_message(channel, 'The current leader is ' + self.leader + '. Waiting for them to choose a team.')
+
+		self._bot.send_message(self.leader, 'You need to pick ' + teamsize + ' people to go on a mission.')
+		self._bot.send_message(leader, 'Syntax: Pick' + ' <Name>' * teamsize)
+
+	def OnPrivateMessage(self, sender, message):
+		if sender != self.leader:
+			return
+
 
 def lookup_team_size(numplayers, numround):
 	teamsize = [3, 4, 4, 5, 5]

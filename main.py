@@ -92,14 +92,14 @@ class StateBot(bot.SimpleBot):
 		left_to_voice = users[:]
 		while left_to_voice:
 			num_to_voice = min(len(left_to_voice), 4)
-			self.execute('MODE', channel, '+v' * num_to_voice + " "  + " ".join(left_to_voice[:num_to_voice])
+			self.execute('MODE', channel, '+v' * num_to_voice + " "  + " ".join(left_to_voice[:num_to_voice]))
 			left_to_voice = left_to_voice[left_to_voice:]
 	
 	def devoice_users(self, users, channel):
 		left_to_devoice = users[:]
 		while left_to_devoice:
 			num_to_devoice = min(len(left_to_devoice), 4)
-			self.execute('MODE', channel, '-v' * num_to_devoice + " "  + " ".join(left_to_devoice[:num_to_devoice])
+			self.execute('MODE', channel, '-v' * num_to_devoice + " "  + " ".join(left_to_devoice[:num_to_devoice]))
 			left_to_devoice = left_to_devoice[left_to_devoice:]
 
 	def moderate_channel(self, channel):
