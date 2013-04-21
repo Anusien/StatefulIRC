@@ -80,7 +80,6 @@ class FormingState(main.State):
 				for layer in players[numspies:]:
 					self._bot.send_message(player, 'You are a loyal member of The Resistance.')
 				random.shuffle(players)
-				print 'The order of leaders will be ' + ', '.join(players)
 				roundnum = 1
 				self._bot.go_to_state('Leading')
 
@@ -100,7 +99,7 @@ class LeadingState(main.State):
 		self._bot.send_message(channel,
 			'The team size will be ' + teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.')
 		self._bot.send_message(channel,
-			'The current leader is ' + self.leader + '. Waiting for them to choose a team.')
+			'The current leader is ' + self.leader + '. Waiting for them to choose a team. The order of leaders will be ' + ', '.join(players))
 		send_syntax_to_leader()
 		self._bot.voice_users(players, channel)
 
