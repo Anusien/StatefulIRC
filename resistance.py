@@ -83,26 +83,53 @@ class LeadingState(main.State):
 	def OnEnterstate(self):
 		self.leader = players[0]
 		team = []
-		teamsize = lookup_team_size(len(players), roundnum)
-		sabotagesize = lookup_team_size(len(players), roundnum)
+		teamsize = lookup_team_size(roundnum)
+		sabotagesize = lookup_team_size(roundnum)
 
-		self._bot.send_message(channel, 'It is round ' + roundnum + '. There have been ' + leaderattempts + ' previously.')
-		self._bot.send_message(channel, 'The team size will be ' + teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.')
-		self._bot.send_message(channel, 'The current leader is ' + self.leader + '. Waiting for them to choose a team.')
+		self._bot.send_message(channel,
+			'It is round ' + roundnum + '. There have been ' + leaderattempts + ' previously.')
+		self._bot.send_message(channel,
+			'The team size will be ' + teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.')
+		self._bot.send_message(channel,
+			'The current leader is ' + self.leader + '. Waiting for them to choose a team.')
+		send_syntax_to_leader()
 
+	def send_syntax_to_leader(self):
 		self._bot.send_message(self.leader, 'You need to pick ' + teamsize + ' people to go on a mission.')
-		self._bot.send_message(leader, 'Syntax: Pick' + ' <Name>' * teamsize)
+		self._bot.send_message(self.leader, 'Syntax: Pick' + ' <Name>' * teamsize)
 
 	def OnPrivateMessage(self, sender, message):
 		if sender != self.leader:
 			return
+		messagetokens = message.lower().split()
+		if messagetokens[0] == 'help':
+			send_syntax_to_leader()
+		elif messagetokens[0] == 'pick':
+			pickedplayers = set(messagetokens[1:])
+			numpicked = len(messagetokens[1:])
+			if numpicked != teamsize:
+				self._bot.send_message(self.leader,
+					'You picked ' + numpicked + ' players when you should pick ' + teamsize + '.')
+				return
+			lowercaseplayers = [x.lower() for x in players]
+			for picked in pickedplayers:
+				if picked not in lowercaseplayers:
+					self._bot.send_message(self.leader, picked = ' is not in the list of players. Pick again!')
+					return
+				team.append(players[lowercaseplayers.index(picked)])
+			self._bot.go_to_state('Approving')
+
+class ApprovingState(main.State):
+	@property
+	def name(self):
+		return 'Approving'
 
 
-def lookup_team_size(numplayers, numround):
+def lookup_team_size(numround):
 	teamsize = [3, 4, 4, 5, 5]
 	return teamsize[numround-1]
 
-def lookup_sabotage_size(numplayers, numround):
+def lookup_sabotage_size(numround):
 	sabotagesize = [1, 1, 1, 2, 1]
 	return sabotagesize[numround-1]
 	
@@ -112,10 +139,12 @@ offstate = OffState()
 idlestate = IdleState()
 formingstate = FormingState()
 leadingstate = LeadingState()
+approvingstate = ApprovingState()
 
 channel = '#mtgresistance'
 players = []
+team = []
 roundnum = 0
 leaderattempts = 0
 
-resistancebot = main.StateBot('Resistr', 'irc.efnet.nl', [channel], masterstate, [idlestate, offstate, formingstate, leadingstate])
+resistancebot = main.StateBot('Resistr', 'irc.efnet.nl', [channel], masterstate, [idlestate, offstate, formingstate, leadingstate, approvingstate])
