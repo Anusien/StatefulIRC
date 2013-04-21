@@ -64,6 +64,9 @@ class StateBot(bot.SimpleBot):
 		sender = event.source
 		channel = event.target
 		message = event.message
+
+		self.masterstate.OnChannelMessage(sender, channel, message)
+		self.state.OnChannelMessage(sender, channel, message)
 	
 	def on_private_message(self, event):
 		sender = event.source
