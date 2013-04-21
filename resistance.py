@@ -4,14 +4,14 @@ import random
 import time
 
 gamechannel = '#mtgresistance'
-players = []
-lowercaseplayers = []
+players = dict() #Maps lowercase representation of the user to the User object
+leaderlist = []
 team = []
 spies = []
-numplayers = 0
 roundnum = 0
 failedmissions = 0
 leaderattempts = 0
+voiced = False #For replacing. Everyone is +v or -v together. Replaced players come in with this status
 
 minplayers = 5
 maxplayers = 10
@@ -21,11 +21,12 @@ class MasterState(main.State):
 	def name(self):
 		return 'Master'
 	
-	def OnPrivateMessage(self, sender, message):
-		if message.lower() == 'turn off':
+	def OnPrivateMessage(self, user, message):
+		owner = is_owner(user)
+		if owner and message.lower() == 'turn off':
 			self._bot.go_to_state('Off')
-		elif message.lower() == 'what state':
-			self._bot.send_message(sender, self._bot.state.name)
+		elif owner and message.lower() == 'what state':
+			self._bot.send_message(user.nickname, self._bot.state.name)
 
 class OffState(main.State):
 	@property
@@ -38,8 +39,8 @@ class OffState(main.State):
 	def OnLeaveState(self):
 		self._bot.send_message_all_channels('Turning back on. Type !newgame to start a new game.')
 	
-	def OnPrivateMessage(self, sender, message):
-		if message.lower() == "turn on":
+	def OnPrivateMessage(self, user, message):
+		if is_owner(user) and message.lower() == "turn on":
 			self._bot.go_to_state('Idle')
 
 class IdleState(main.State):
@@ -50,7 +51,7 @@ class IdleState(main.State):
 	def OnEnterState(self):
 		self._bot.unmoderate_channel(gamechannel)
 
-	def OnChannelMessage(self, sender, channel, message):
+	def OnChannelMessage(self, user, message):
 		if message.lower() == '!newgame':
 			self._bot.go_to_state('Forming')
 
@@ -60,44 +61,51 @@ class FormingState(main.State):
 		return 'Forming'
 	
 	def OnEnterState(self):
-		players[:] = []
+		global voiced
+		voiced = True 
+
+		players.clear()
 		self._bot.send_message(gamechannel, 'Newgame forming, type !join to join.')
 
 	def OnLeaveState(self):
 		self._bot.devoice_users(players, gamechannel)
 	
-	def OnChannelMessage(self, sender, channel, message):
+	def OnChannelMessage(self, user, channel, message):
 		message = message.lower()
+		playing = is_nickname_in_game(user.nickname)
 		if message == '!cancel':
 			self._bot.send_message(gamechannel, 'Game cancelled.')
 			self._bot.go_to_state('Idle')
 		elif message == '!join':
-			if sender not in players:
-				players.append(sender)
+			if not playing:
+				players[users.nickname.lower()] = user
 				self._bot.voice_user(sender, gamechannel)
 		elif message == "!leave":
-			if sender in players:
-				players.remove(sender)
+			if playing:
+				players.pop(user.nickname.lower())
 				self._bot.devoice_user(sender, gamechannel)
 		elif message == '!formed':
 			if len(players) < minplayers or len(players) > maxplayers:
 				self._bot.send_message(gamechannel, len(players) + ' players are in the game. Need between ' + minplayers + ' and ' + maxplayers + ' to start.')
 			else:
-				global numplayers
 				global roundnum
+				roundnum = 1
 
 				numplayers = len(players)
 				numspies = lookup_num_spies(numplayers)
 				self._bot.send_message(gamechannel, 'Game formed with ' + numspies + ' spies and ' + numplayers - numspies + ' + Resistance members.')
-				lowercaseplayers[:] = [x.lower() for x in players]
-				random.shuffle(players)
-				spies[:] = players[:numspies]
+
+				leaderlist[:] = []
+				for user in players.itervalues():
+					leaderlist.append(players.nickname)
+
+				random.shuffle(leaderlist)
+				spies[:] = players[:leastlist]
 				for player in spies:
 					self._bot.send_message(player, 'You are an IMPERIAL SPY! The spies are ' + ', '.join(spies))
-				for player in players[numspies:]:
+				for player in leaderlist[numspies:]:
 					self._bot.send_message(player, 'You are a loyal member of The Resistance.')
-				random.shuffle(players)
-				roundnum = 1
+				random.shuffle(leaderlist)
 				self._bot.go_to_state('Leading')
 
 class LeadingState(main.State):
@@ -108,6 +116,7 @@ class LeadingState(main.State):
 	def OnEnterstate(self):
 		self.leader = players[0]
 		team[:] = []
+		numplayers = len(players)
 		self.teamsize = lookup_team_size(numplayers, roundnum)
 		sabotagesize = lookup_team_size(numplayers, roundnum)
 
@@ -188,6 +197,7 @@ class ApprovingState(main.State):
 			self.playervotes[sender] = 1
 		elif message == 'no' or message == 'n':
 			self.playervotes[sender] = 0
+		numplayers = len(players)
 		if len(self.playervotes) == numplayers:
 			vote = sum(self.playervotes.values()) >= numplayers / 2
 			if vote:
@@ -203,7 +213,7 @@ class MissionState(main.State):
 
 	def EnterState(self):
 		self.playervotes = dict()
-		sabotagesize = lookup_sabotage_size(numplayers, roundnum)
+		sabotagesize = lookup_sabotage_size(len(players), roundnum)
 		votetext = 'vote is' if sabotagesize == 1 else 'votes are'
 		self._bot.send_message(gamechannel,
 			'The team was accepted! /message me with SUCCESS or FAILURE as your vote for this mission. Loyal resistance members should always vote SUCCESS. ' + sabotagesize + ' ' + votetext + ' required to fail this mission.')
@@ -224,7 +234,7 @@ class MissionState(main.State):
 			self.playervotes[sender] = 1
 		if len(self.playervotes) == len(team):
 			numfails = sum(self.playervotes.values())
-			vote = numfails >= lookup_sabotage_size(numplayers, roundnum)
+			vote = numfails >= lookup_sabotage_size(len(players), roundnum)
 			if vote:
 				global failedmissions
 				failedmissions += 1	
@@ -288,6 +298,30 @@ def get_proper_capitalized_player(lowercase_player_name):
 	for player in players:
 		if player.lower() == lowercase_player_name:
 			return player
+
+def is_owner(user):
+	return user.hostname == "cpe-24-27-11-24.austin.res.rr.com"
+
+def is_nickname_in_game(nickname):
+	return nickname.lower() in players
+
+def is_hostname_in_game(hostname):
+	for user in players.itervalues():
+		if user.hostname == hostname:
+			return True
+	return False
+
+def voice_room(bot):
+	""" Automatically voice all the players and set the voiced state to true. """
+	global voiced
+	voiced = True
+	bot.voice_users(players, gamechannel)
+
+def devoice_room(bot):
+	""" Automatically devoice all the players and set the voiced state to false. """
+	global voiced
+	voiced = False
+	bot.devoice_users(players, gamechannel)
 
 masterstate = MasterState()
 offstate = OffState()
