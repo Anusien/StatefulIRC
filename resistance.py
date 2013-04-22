@@ -363,7 +363,7 @@ def replace_user(olduser, newuser, bot):
 	# Since there's no way to get hostmask on demand
 	if not nickname_in_game(olduser.nickname) or nickname_in_game(newuser.nickname):
 		return
-	bot.devoice_nick(olduser.nickname, channel)
+	bot.devoice_nick(olduser.nickname, gamechannel)
 
 	bot.send_message(gamechannel, textformat.bold('Replacing ' + olduser.nickname + ' with ' + newuser.nickname + '.'))
 	players.pop(olduser.nickname.lower())
@@ -382,7 +382,7 @@ def replace_user(olduser, newuser, bot):
 		bot.send_message(newuser.nickname, 'You are a loyal member of The Resistance.')
 
 	if voiced:
-		bot.voice_nick(newuser.nickname, channel)
+		bot.voice_nick(newuser.nickname, gamechannel)
 	
 
 masterstate = MasterState()
