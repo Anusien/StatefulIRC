@@ -106,25 +106,26 @@ class StateBot(bot.SimpleBot):
 	def op_user(self, nick, channel):
 		self.execute('MODE', channel, '+o ' + nick)
 
-	def voice_user(self, nick, channel):
-		self.execute('MODE', channel, '-o+v ' + nick + nick)
+	def voice_nick(self, nick, channel):
+		""" Remove operator status and set voice on a given user """
+		self.execute('MODE', channel, '-o+v ' + nick + ' ' +  nick)
 
 	def devoice_nick(self, nick, channel):
 		self.execute('MODE', channel, '-v ' + nick)
 
-	def voice_users(self, nicks, channel):
+	def voice_nicks(self, nicks, channel):
 		left_to_voice = nicks[:]
 		while left_to_voice:
 			num_to_voice = min(len(left_to_voice), 4)
 			self.execute('MODE', channel, '+v' * num_to_voice + " "  + " ".join(left_to_voice[:num_to_voice]))
-			left_to_voice = left_to_voice[left_to_voice:]
+			left_to_voice = left_to_voice[num_to_voice:]
 	
-	def devoice_users(self, nicks, channel):
+	def devoice_nicks(self, nicks, channel):
 		left_to_devoice = nicks[:]
 		while left_to_devoice:
 			num_to_devoice = min(len(left_to_devoice), 4)
 			self.execute('MODE', channel, '-v' * num_to_devoice + " "  + " ".join(left_to_devoice[:num_to_devoice]))
-			left_to_devoice = left_to_devoice[left_to_devoice:]
+			left_to_devoice = left_to_devoice[num_to_devoice:]
 
 	def moderate_channel(self, channel):
 		self.execute('MODE', channel, '+m')

@@ -39,10 +39,15 @@ class MasterState(main.State):
 			newuser = main.User(messagetokens[2], "", "")
 			replace_user(olduser, newuser, self._bot)
 			return
+
+	def OnChannelMessage(self, user, channel, message):
+		if is_owner(user) and message.lower() == '!nullgame' and self._bot.state.name != 'Off':
+			self._bot.send_message(gamechannel, textformat.bold('Game nulled.'))
+			self._bot.go_to_state('Idle')
 	
 	def OnJoin(self, channel, user):
 		if nickname_in_game(user.nickname) and voiced:
-			self._bot.voice_user(user.nickname)
+			self._bot.voice_nick(user.nickname, channel)
 		elif not nickname_in_game(user.nickname) and hostmask_in_game(user.ident, user.hostname):
 			replace_user(find_user_by_hostmask(user.ident, user.hostname), user, self._bot)
 			
@@ -95,17 +100,25 @@ class FormingState(main.State):
 		if message == '!cancel':
 			self._bot.send_message(gamechannel, textformat.bold('Game cancelled.'))
 			self._bot.go_to_state('Idle')
+			return
 		elif message == '!join':
 			if not playing:
 				players[user.nickname.lower()] = user
-				self._bot.voice_user(user.nickname, gamechannel)
+				self._bot.voice_nick(user.nickname, gamechannel)
+			return
 		elif message == "!leave":
 			if playing:
 				players.pop(user.nickname.lower())
-				self._bot.devoice_user(user.nickname, gamechannel)
+				self._bot.devoice_nick(user.nickname, gamechannel)
+				if len(players) == 0:
+					self._bot.send_message(gamechannel, textformat.bold('Game cancelled.'))
+					self._bot.go_to_state('Idle')
+			return
 		elif message == '!formed':
 			if len(players) < minplayers or len(players) > maxplayers:
-				self._bot.send_message(gamechannel, textformat.bold(len(players) + ' players are in the game. Need between ' + minplayers + ' and ' + maxplayers + ' to start.'))
+				playertext = ' player' if len(players) == 1 else ' players'
+				self._bot.send_message(gamechannel,
+					textformat.bold('There are ' + str(len(players)) + playertext + ' in the game. Need between ' + str(minplayers) + ' and ' + str(maxplayers) + ' to start.'))
 			else:
 				global roundnum
 				roundnum = 1
@@ -113,7 +126,7 @@ class FormingState(main.State):
 				self._bot.moderate_channel(gamechannel)
 				numplayers = len(players)
 				numspies = lookup_num_spies(numplayers)
-				self._bot.send_message(gamechannel, textformat.bold('Game formed with ' + numspies + ' spies and ' + numplayers - numspies + ' + Resistance members.'))
+				self._bot.send_message(gamechannel, textformat.bold('Game formed with ' + str(numspies) + ' spies and ' + str(numplayers - numspies) + ' + Resistance members.'))
 
 				leaderlist[:] = []
 				for user in players.itervalues():
@@ -141,19 +154,19 @@ class LeadingState(main.State):
 		sabotagesize = lookup_team_size(numplayers, roundnum)
 
 		self._bot.send_message(gamechannel, textformat.bold(
-			'It is round ' + roundnum + '. The spies have won ' + failedmissions + ' of them (3 to win). There have been ' + leaderattempts + ' this round.'))
+			'It is round ' + str(roundnum) + '. The spies have won ' + str(failedmissions) + ' of them (3 to win). There have been ' + str(leaderattempts) + ' this round.'))
 		self._bot.send_message(gamechannel, textformat.bold(
-			'The team size will be ' + self.teamsize + ' and the number of saboteurs needed is ' + sabotagesize + '.'))
+			'The team size will be ' + str(self.teamsize) + ' and the number of saboteurs needed is ' + str(sabotagesize) + '.'))
 		self._bot.send_message(gamechannel, textformat.bold(
 			'The current leader is ' + self.leader + '. Waiting for them to choose a team. The order of leaders will be ' + ', '.join(players)))
 		self.send_syntax_to_leader()
-		self._bot.voice_users(players, gamechannel)
+		self._bot.voice_nicks(players, gamechannel)
 
 	def OnLeaveState(self):
-		self._bot.devoice_users(players, gamechannel)
+		self._bot.devoice_nicks(players, gamechannel)
 
 	def send_syntax_to_leader(self):
-		self._bot.send_message(self.leader, 'You need to pick ' + self.teamsize + ' people to go on a mission.')
+		self._bot.send_message(self.leader, 'You need to pick ' + str(self.teamsize) + ' people to go on a mission.')
 		self._bot.send_message(self.leader, 'Syntax: Pick' + ' <Name>' * self.teamsize)
 
 	def OnPrivateMessage(self, user, message):
@@ -169,7 +182,7 @@ class LeadingState(main.State):
 			numpicked = len(messagetokens[1:])
 			if numpicked != self.teamsize:
 				self._bot.send_message(self.leader,
-					'You picked ' + numpicked + ' players when you should pick ' + self.teamsize + '.')
+					'You picked ' + str(numpicked) + ' players when you should pick ' + str(self.teamsize) + '.')
 				return
 			for picked in pickedplayers:
 				if not nickname_in_game(picked):
@@ -187,17 +200,17 @@ class ApprovingState(main.State):
 	def OnEnterState(self):
 		leaderlist.append(players.pop(0))
 		self._bot.send_message(gamechannel, textformat.bold(
-			'The leader picked this team: ' + ', '.join(team) + 'This is attempt ' + leaderattempts + '. The mission is automatically accepted after 5 attempts.'))
+			'The leader picked this team: ' + ', '.join(team) + 'This is attempt ' + str(leaderattempts) + '. The mission is automatically accepted after 5 attempts.'))
 		if leaderattempts == 5:
 			self._bot.go_to_state('Mission')
 			return
 		self._bot.send_message(gamechannel, textformat.bold(
 			'/message me either Yes or No to indicate your support or rejection of this mission. Majority rules, ties ruled in favor of the mission.'))
 		self.playervotes = dict()
-		self._bot.voice_users(players, gamechannel)
+		self._bot.voice_nicks(players, gamechannel)
 
 	def OnLeaveState(self):
-		self._bot.devoice_users(players, gamechannel)
+		self._bot.devoice_nicks(players, gamechannel)
 		self._bot.send_message(gamechannel, textformat.bold('Here is the vote:'))
 		for player in self.playervotes.iterkeys():
 			playername = get_proper_capitalized_player(player)
@@ -235,7 +248,7 @@ class MissionState(main.State):
 		sabotagesize = lookup_sabotage_size(len(players), roundnum)
 		votetext = 'vote is' if sabotagesize == 1 else 'votes are'
 		self._bot.send_message(gamechannel, textformat.bold(
-			'The team was accepted! /message me with SUCCESS or FAILURE as your vote for this mission. Loyal resistance members should always vote SUCCESS. ' + sabotagesize + ' ' + votetext + ' required to fail this mission.'))
+			'The team was accepted! /message me with SUCCESS or FAILURE as your vote for this mission. Loyal resistance members should always vote SUCCESS. ' + str(sabotagesize) + ' ' + votetext + ' required to fail this mission.'))
 	
 	def OnPrivateMessage(self, user, message):
 		global roundnum
@@ -260,7 +273,7 @@ class MissionState(main.State):
 			resulttext = 'failure' if vote else 'success'
 			votetext = ' vote' if numfails == 1 else ' votes'
 
-			self._bot.send_message(gamechannel, textformat.bold('There were ' + numfails + votetext + ' to sabotage. The missions was a ' + resulttext + '!'))
+			self._bot.send_message(gamechannel, textformat.bold('There were ' + str(numfails) + votetext + ' to sabotage. The mission was a ' + resulttext + '!'))
 			if failedmissions == 3:
 				self._bot.send_message(gamechannel, textformat.bold('The game is over. Spies win!'))
 				self._bot.go_to_state('Endgame')
@@ -337,20 +350,20 @@ def voice_room(bot):
 	""" Automatically voice all the players and set the voiced state to true. """
 	global voiced
 	voiced = True
-	bot.voice_users(players.keys(), gamechannel)
+	bot.voice_nicks(players.keys(), gamechannel)
 
 def devoice_room(bot):
 	""" Automatically devoice all the players and set the voiced state to false. """
 	global voiced
 	voiced = False
-	bot.devoice_users(players.keys(), gamechannel)
+	bot.devoice_nicks(players.keys(), gamechannel)
 
 def replace_user(olduser, newuser, bot):
 	# This is a little ugly; we can't replace the underlying user object with the right info
 	# Since there's no way to get hostmask on demand
 	if not nickname_in_game(olduser.nickname) or nickname_in_game(newuser.nickname):
 		return
-	bot.devoice_user(olduser.nickname)
+	bot.devoice_nick(olduser.nickname)
 
 	bot.send_message(gamechannel, textformat.bold('Replacing ' + olduser.nickname + ' with ' + newuser.nickname + '.'))
 	players.pop(olduser.nickname.lower())
@@ -369,7 +382,7 @@ def replace_user(olduser, newuser, bot):
 		bot.send_message(newuser.nickname, 'You are a loyal member of The Resistance.')
 
 	if voiced:
-		bot.voice_user(newuser.nickname)
+		bot.voice_nick(newuser.nickname)
 	
 
 masterstate = MasterState()
