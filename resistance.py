@@ -26,8 +26,26 @@ class MasterState(main.State):
 		owner = is_owner(user)
 		if owner and message.lower() == 'turn off':
 			self._bot.go_to_state('Off')
+			return
 		elif owner and message.lower() == 'what state':
 			self._bot.send_message(user.nickname, self._bot.state.name)
+			return
+
+		messagetokens = message.split()
+		if messagetokens[0].lower() == 'replace' and len(messagetokens[0]) == 3:
+			if not nickname_in_game(messagetokens[1].lower()):
+				return
+			olduser = players[messagetokens[1].lower()]
+			newuser = main.User(messagetokens[2], "", "")
+			replace_user(olduser, newuser, self._bot)
+			return
+	
+	def OnJoin(self, channel, user):
+		if nickname_in_game(user.nickname) and voiced:
+			self._bot.voice_user(user.nickname)
+		elif not nickname_in_game(user.nickname) and hostmask_in_game(user.ident, user.hostname):
+			replace_user(find_user_by_hostmask(user.ident, user.hostname), user, self._bot)
+			
 
 class OffState(main.State):
 	@property
@@ -73,7 +91,7 @@ class FormingState(main.State):
 	
 	def OnChannelMessage(self, user, channel, message):
 		message = message.lower()
-		playing = is_nickname_in_game(user.nickname)
+		playing = nickname_in_game(user.nickname)
 		if message == '!cancel':
 			self._bot.send_message(gamechannel, textformat.bold('Game cancelled.'))
 			self._bot.go_to_state('Idle')
@@ -154,7 +172,7 @@ class LeadingState(main.State):
 					'You picked ' + numpicked + ' players when you should pick ' + self.teamsize + '.')
 				return
 			for picked in pickedplayers:
-				if not is_nickname_in_game(picked):
+				if not nickname_in_game(picked):
 					self._bot.send_message(self.leader, picked = ' is not in the list of players. Pick again!')
 					return
 				team.append(get_proper_capitalized_player(picked))
@@ -189,7 +207,7 @@ class ApprovingState(main.State):
 	def OnPrivateMessage(self, user, message):
 		message = message.lower()
 		sender = user.nickname.lower()
-		if not is_nickname_in_game(sender):
+		if not nickname_in_game(sender):
 			return
 		if message == 'help':
 			self._bot.send_message(sender, '/message YES or NO to support or reject the mission.')
@@ -303,14 +321,17 @@ def get_proper_capitalized_player(lowercase_player_name):
 def is_owner(user):
 	return user.hostname == "cpe-24-27-11-24.austin.res.rr.com"
 
-def is_nickname_in_game(nickname):
+def find_user_by_hostmask(ident, hostname):
+	for user in players.itervalues():
+		if user.hostname == hostname and user.ident == ident:
+			return user 
+	return None 
+
+def nickname_in_game(nickname):
 	return nickname.lower() in players
 
-def is_hostname_in_game(hostname):
-	for user in players.itervalues():
-		if user.hostname == hostname:
-			return True
-	return False
+def hostmask_in_game(ident, hostname):
+	return find_user_by_hostmask(ident, hostname) is not None
 
 def voice_room(bot):
 	""" Automatically voice all the players and set the voiced state to true. """
@@ -323,6 +344,33 @@ def devoice_room(bot):
 	global voiced
 	voiced = False
 	bot.devoice_users(players.keys(), gamechannel)
+
+def replace_user(olduser, newuser, bot):
+	# This is a little ugly; we can't replace the underlying user object with the right info
+	# Since there's no way to get hostmask on demand
+	if not nickname_in_game(olduser.nickname) or nickname_in_game(newuser.nickname):
+		return
+	bot.devoice_user(olduser.nickname)
+
+	bot.send_message(gamechannel, textformat.bold('Replacing ' + olduser.nickname + ' with ' + newuser.nickname + '.'))
+	players.pop(olduser.nickname.lower())
+	players[newuser.nickname.lower()] = newuser
+
+	if olduser.nickname in leaderlist:
+		leaderlist[leaderlist.index(olduser.nickname)] = newuser.nickname
+
+	if olduser.nickname in team:
+		team[team.index(olduser.nickname)] = newuser.nickname
+
+	if olduser.nickname in spies:
+		spies[spies.index(olduser.nickname)] = newuser.nickname
+		bot.send_message(newuser.nickname, 'You are an IMPERIAL SPY! The spies are ' + ', '.join(spies))
+	else:
+		bot.send_message(newuser.nickname, 'You are a loyal member of The Resistance.')
+
+	if voiced:
+		bot.voice_user(newuser.nickname)
+	
 
 masterstate = MasterState()
 offstate = OffState()
