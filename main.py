@@ -65,7 +65,10 @@ class StateBot(bot.SimpleBot):
 	def go_to_state(self, statename):
 		state = self._find_state(statename)
 		if self.state != None:
+			print 'Leaving ' + self.state.name + ' state and entering ' + statename + ' state.'
 			self.state.OnLeaveState()
+		else:
+			print 'Leaving None state and entering ' + statename + ' state.'
 		self.state = state
 		state.OnEnterState()
 
