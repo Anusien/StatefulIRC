@@ -116,9 +116,9 @@ class FormingState(main.State):
 			return
 		elif message == '!formed':
 			if len(players) < minplayers or len(players) > maxplayers:
-				playertext = ' player' if len(players) == 1 else ' players'
+				playertext = 'is 1 player' if len(players) == 1 else 'are ' + str(len(players)) + ' players'
 				self._bot.send_message(gamechannel,
-					textformat.bold('There are ' + str(len(players)) + playertext + ' in the game. Need between ' + str(minplayers) + ' and ' + str(maxplayers) + ' to start.'))
+					textformat.bold('There ' + playertext + ' in the game. Need between ' + str(minplayers) + ' and ' + str(maxplayers) + ' to start.'))
 			else:
 				global roundnum
 				roundnum = 1
@@ -363,7 +363,7 @@ def replace_user(olduser, newuser, bot):
 	# Since there's no way to get hostmask on demand
 	if not nickname_in_game(olduser.nickname) or nickname_in_game(newuser.nickname):
 		return
-	bot.devoice_nick(olduser.nickname)
+	bot.devoice_nick(olduser.nickname, channel)
 
 	bot.send_message(gamechannel, textformat.bold('Replacing ' + olduser.nickname + ' with ' + newuser.nickname + '.'))
 	players.pop(olduser.nickname.lower())
@@ -382,7 +382,7 @@ def replace_user(olduser, newuser, bot):
 		bot.send_message(newuser.nickname, 'You are a loyal member of The Resistance.')
 
 	if voiced:
-		bot.voice_nick(newuser.nickname)
+		bot.voice_nick(newuser.nickname, channel)
 	
 
 masterstate = MasterState()
