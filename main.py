@@ -65,10 +65,10 @@ class StateBot(bot.SimpleBot):
 	def go_to_state(self, statename):
 		state = self._find_state(statename)
 		if self.state != None:
-			print 'Leaving ' + self.state.name + ' state and entering ' + statename + ' state.'
+			#print 'Leaving ' + self.state.name + ' state and entering ' + statename + ' state.'
 			self.state.OnLeaveState()
-		else:
-			print 'Leaving None state and entering ' + statename + ' state.'
+		#else:
+			#print 'Leaving None state and entering ' + statename + ' state.'
 		self.state = state
 		state.OnEnterState()
 
@@ -101,6 +101,22 @@ class StateBot(bot.SimpleBot):
 
 		self.masterstate.OnPrivateMessage(user, message)
 		self.state.OnPrivateMessage(user, message)
+
+	def on_error(self, event):
+		print "in on_error:"
+		print event.source
+		print event.target
+		print event.command
+		print event.user
+		print event.host
+		for param in event.params:
+			print param
+
+	def on_quit(self, event):
+		user = self._get_user_from_event(event)
+		if user.nickname == self.nickname:
+			quit()
+
 
 	def send_message_all_channels(self, message):
 		for channel in self.channels.iterkeys():
