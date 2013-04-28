@@ -81,7 +81,7 @@ class IdleState(main.State):
 	
 	def OnEnterState(self):
 		self._bot.unmoderate_channel(gamechannel)
-		devoice_room(bot)
+		devoice_room(self._bot)
 
 	def OnChannelMessage(self, user, channel, message):
 		if message.lower() == '!newgame':
@@ -155,18 +155,10 @@ class FormingState(main.State):
 					send_and_notice(self._bot, player, 'You are a loyal member of The Resistance.')
 				random.shuffle(leaderlist)
 
-				text = "Team size by round: "
-				for i in range(1, 6):
-					if i != 1:
-						text = text + ', '
-					text = text + str(lookup_team_size(numplayers, i))
+				text = "Team size by round: " + ', '.join(get_team_grid(numplayers))
 				self._bot.send_message(gamechannel, textformat.bold(text))
 
-				text = "Number of fails needed by round: "
-				for i in range(1, 6):
-					if i != 1:
-						text = text + ', '
-					text = text + str(lookup_sabotage_size(numplayers, i))
+				text = "Number of fails needed by round: " + ', '.join(get_sabotage_grid(numplayers))
 				self._bot.send_message(gamechannel, textformat.bold(text))
 
 				self._bot.go_to_state('Leading')
@@ -186,7 +178,7 @@ class LeadingState(main.State):
 		self._bot.send_message(gamechannel, textformat.bold(
 			'Round ' + str(roundnum) + '/5. Resistance: ' + str(roundnum-1-failedmissions) + ', Spies: ' + str(failedmissions) + '. Rejected teams this round: ' + str(leaderattempts) + '. Team size: ' + str(self.teamsize) + '. Fails required: ' + str(sabotagesize) + '.'))
 		self._bot.send_message(gamechannel, textformat.bold(
-			'The current leader is ' + players[self.leader].nickname + '. The order of leaders will be ' + collate_players(leaderlist)))
+			'The current leader is ' + get_proper_capitalized_player(self.leader) + '. The order of leaders will be ' + collate_players(leaderlist)))
 		self.send_syntax_to_leader()
 
 	def OnLeaveState(self):
@@ -231,7 +223,7 @@ class ApprovingState(main.State):
 		self.leader = leaderlist[0]
 		leaderlist.append(leaderlist.pop(0))
 		self._bot.send_message(gamechannel, textformat.bold(
-			players[self.leader].nickname + ' picked this team: ' + collate_players(team) + '. This is attempt ' + str(leaderattempts) + '. The mission is automatically accepted after 5 attempts.'))
+			get_proper_capitalized_player(self.leader) + ' picked this team: ' + collate_players(team) + '. This is attempt ' + str(leaderattempts) + '. The mission is automatically accepted after 5 attempts.'))
 		if leaderattempts == 5:
 			self._bot.go_to_state('Mission')
 			return
@@ -351,25 +343,29 @@ class EndgameState(main.State):
 		self._bot.unmoderate_channel(gamechannel)
 
 		
-
-def lookup_team_size(_numplayers, _numround):
+def get_team_grid(_numplayers):
 	teamsize = [[2, 3, 2, 3, 3],
 				[2, 3, 4, 3, 4],
 				[2, 3, 3, 4, 4],
 				[3, 4, 4, 5, 5],
 				[3, 4, 4, 5, 5],
 				[3, 4, 4, 5, 5]]
-	return teamsize[_numplayers-5][_numround-1]
+	return teamsize[_numplayers-5]
 
-def lookup_sabotage_size(_numplayers, _numround):
+def lookup_team_size(_numplayers, _numround):
+	return get_team_grid([_numplayers-5])[_numround-1]
+
+def get_sabotage_grid(_numplayers):
 	sabotagesize = [[1, 1, 1, 1, 1],
 					[1, 1, 1, 1, 1],
 					[1, 1, 1, 2, 1],
 					[1, 1, 1, 2, 1],
 					[1, 1, 1, 2, 1],
 					[1, 1, 1, 2, 1]]
+	return sabotagesize[_numplayers-5]
 
-	return sabotagesize[_numplayers - 5][_numround-1]
+def lookup_sabotage_size(_numplayers, _numround):
+	return get_sabotage_grid(_numplayers - 5)[_numround-1]
 
 def lookup_num_spies(_numplayers):
 	# The number of spies is one third the size of the group rounded up
@@ -435,7 +431,7 @@ def replace_user(olduser, newuser, bot):
 def collate_players(playerlist):
 	newplayerlist = []
 	for player in playerlist:
-		newplayerlist.append(players[player].nickname)
+		newplayerlist.append(get_proper_capitalized_player(player))
 	return ', '.join(newplayerlist)
 	
 def send_and_notice(bot, target, message):
