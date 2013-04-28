@@ -112,6 +112,16 @@ class StateBot(bot.SimpleBot):
 		for param in event.params:
 			print param
 
+	def on_disconnect(self, event):
+		print "in on_disconnect:"
+		print event.source
+		print event.target
+		print event.command
+		print event.user
+		print event.host
+		for param in event.params:
+			print param
+
 	def on_quit(self, event):
 		user = self._get_user_from_event(event)
 		if user.nickname == self.nickname:
